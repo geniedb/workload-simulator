@@ -1,41 +1,39 @@
 // ---------------------------------------
 // Tools for setting and getting workload.
-// 
-function getWorkload() 
-{
+//
+function getWorkload() {
     var ret = {}
     for (var i in query_widget_map) {
         if (!query_widget_map[i].codemirror) {
             continue;
         }
         query = query_widget_map[i].codemirror.getValue();
-        qps   = query_widget_map[i].dial.attr('value');
-    
+        qps = query_widget_map[i].dial.attr('value');
+
         if (query == '') {
             continue;
         }
 
         ret[i] = {
-            'query' : query,
-            'qps'  :  qps
+            'query': query,
+            'qps': qps
         };
     }
     return ret;
 }
 
-function cacheWorkload()
-{
+function cacheWorkload() {
     var all = {}
     for (var i in query_widget_map) {
         if (!query_widget_map[i].codemirror) {
             continue;
         }
         query = query_widget_map[i].codemirror.getValue();
-        qps   = query_widget_map[i].dial.attr('value');
+        qps = query_widget_map[i].dial.attr('value');
 
         all[i] = {
-            'query' : query,
-            'qps'  :  qps
+            'query': query,
+            'qps': qps
         };
     }
 
@@ -46,14 +44,11 @@ function cacheWorkload()
 function loadWorkload(workload) {
     max_index = 0;
     clearQueryWidgets();
-    for (var i in workload)
-    {
+    for (var i in workload) {
         max_index = Math.max(i, max_index);
     }
-    for (var i = 0; i <= max_index; i++)
-    {
-        if (workload[i] != null)
-        {
+    for (var i = 0; i <= max_index; i++) {
+        if (workload[i] != null) {
             q = new QueryWidget();
             q.codemirror.setValue(workload[i]['query']);
             q.dialValue = workload[i]['qps'];
@@ -67,11 +62,15 @@ function loadWorkload(workload) {
 //
 function updateSettings() {
     g_settings = {};
-    $("#settings-form").find("input").each(function(i, e) {
+    $("#settings-form").find("input").each(function (i, e) {
         var _e = $(e);
         g_settings[_e.attr('id')] = _e.val();
     });
     g_settings['dial_max_value'] = dial_max_value;
+
+    if (g_settings['host_label']) {
+        $('#titleText').text(g_settings['host_label']);
+    }
 }
 
 function getSettings() {
@@ -81,8 +80,7 @@ function getSettings() {
     return g_settings;
 }
 
-function cacheSettings()
-{
+function cacheSettings() {
     if (livemode) {
         cache_name = 'settings_cache_live';
     } else {
@@ -93,8 +91,7 @@ function cacheSettings()
     localStorage.setItem(cache_name, settings);
 }
 
-function loadCachedSettings()
-{
+function loadCachedSettings() {
     if (livemode) {
         cache_name = 'settings_cache_live';
     } else {
@@ -106,29 +103,24 @@ function loadCachedSettings()
     }
 }
 
-function loadSettings(settings)
-{
+function loadSettings(settings) {
     dial_max_value = settings['dial_max_value'];
     reloadDialMaxValue();
 
-    for (var s in settings)
-    {
+    for (var s in settings) {
         e = $("#" + s);
-        if (e)
-        {
+        if (e) {
             e.val(settings[s]);
         }
     }
     updateSettings();
 }
 
-function reloadDialMaxValue()
-{
+function reloadDialMaxValue() {
     $("#qps-number").attr('value', dial_max_value);
-    console.log(dial_max_value);
+//    console.log(dial_max_value);
 
-    for (var i in query_widget_map)
-    {
+    for (var i in query_widget_map) {
         var widget = query_widget_map[i];
         var val = widget.dial.attr('value')
         widget.replaceDial(false, val);
@@ -136,10 +128,8 @@ function reloadDialMaxValue()
 }
 
 var dialValueEnabled = true;
-function updateDialValue(plus)
-{
-    if (!dialValueEnabled)
-    {
+function updateDialValue(plus) {
+    if (!dialValueEnabled) {
         return;
     }
 
@@ -159,11 +149,9 @@ function updateDialValue(plus)
     reloadDialMaxValue();
 }
 
-function setMaxDialValue(v)
-{
+function setMaxDialValue(v) {
     var vInt = parseInt(v);
-    if (vInt == NaN)
-    {
+    if (vInt == NaN) {
         createError({errno: ER_JS, message: "Invalid integer " + v});
         return;
     }
@@ -172,22 +160,24 @@ function setMaxDialValue(v)
     reloadDialMaxValue();
 }
 
-function activateDialValue()
-{
+function activateDialValue() {
     dialValueEnabled = true;
 
     $("#dial-up").unbind('click');
     $("#dial-down").unbind('click');
 
-    $("#dial-up").click(function()   {  updateDialValue(true);  })
-    $("#dial-down").click(function() {  updateDialValue(false); })
+    $("#dial-up").click(function () {
+        updateDialValue(true);
+    })
+    $("#dial-down").click(function () {
+        updateDialValue(false);
+    })
 
     $("#dial-up").removeClass("disabled");
     $("#dial-down").removeClass("disabled");
 }
 
-function deactivateDialValue()
-{
+function deactivateDialValue() {
     dialValueEnabled = false;
     $("#dial-up").unbind('click');
     $("#dial-down").unbind('click');
@@ -196,13 +186,11 @@ function deactivateDialValue()
     $("#dial-down").addClass("disabled");
 }
 
-function displaySettings()
-{
+function displaySettings() {
     $("#settings-form").show();
     $("#settings-button").addClass('active');
 }
-function hideSettings()
-{
+function hideSettings() {
     $("#settings-form").hide();
     $("#settings-button").removeClass('active');
 }
@@ -212,37 +200,47 @@ var pingingStopped = false;
 function pingServer() {
     if (!pingingStopped) {
         $.ajax({
-            'type'     : 'POST',
-            'url'      : '/ping',
-            'dataType' : 'text',
-            'data'     : null,
-            'success'  : onPingResponse,
-            'error'    : onPingResponse
+            'type': 'POST',
+            'url': '/ping',
+            'dataType': 'text',
+            'data': null,
+            'success': onPingResponse,
+            'error': onPingResponse
         });
     }
 }
 
 function onPingResponse(data, textStatus, jqXHR) {
-    if (data != 'OK') {
-        onPingFailure();
+    if (data !== 'OK') {
+        if (data === 'FAILOVER') {
+            $("#connectionStatus").text('FAILOVER');
+        } else {
+            console.log('Ping Failure', data);
+            onPingFailure();
+        }
     }
 }
 
+var pingFailureCt = 0;
 function onPingFailure() {
-    pingingStopped = true;
-    $("#refresh-modal").modal({keyboard : false, backdrop : 'static', show: true});
+    pingFailureCt += 1;
+
+    if (pingFailureCt > 10) {
+        pingingStopped = true;
+        $("#refresh-modal").modal({keyboard: false, backdrop: 'static', show: true});
+    }
 }
 
 function byeServer() {
     if (!pingingStopped) {
         $.ajax({
-            'type'     : 'PUT',
-            'url'      : '/unload',
-            'async'    : false,
-            'dataType' : 'text',
-            'data'     : null,
-            'success'  : null,
-            'error'    : null 
+            'type': 'PUT',
+            'url': '/unload',
+            'async': false,
+            'dataType': 'text',
+            'data': null,
+            'success': null,
+            'error': null
         });
     }
     pingingStopped = true;
@@ -250,9 +248,8 @@ function byeServer() {
 
 // -------------------------
 // Tools for error handling.
-// 
-function genericError(jqXHR, textStatus, errorThrown)
-{
+//
+function genericError(jqXHR, textStatus, errorThrown) {
     alert("something went wrong...");
     console.log(jqXHR);
     console.log(textStatus);
@@ -260,55 +257,45 @@ function genericError(jqXHR, textStatus, errorThrown)
     console.trace();
 }
 
-var ER_UNKNOWN  = 0
-var ER_DBCONN   = 1
-var ER_DBNAME   = 2
-var ER_JS       = 3
-var ER_QUERY    = 4
+var ER_UNKNOWN = 0
+var ER_DBCONN = 1
+var ER_DBNAME = 2
+var ER_JS = 3
+var ER_QUERY = 4
 var ER_SETTINGS = 5
 
-function errno_to_hint(errno)
-{
-    if (errno == ER_UNKNOWN)
-    {
+function errno_to_hint(errno) {
+    if (errno == ER_UNKNOWN) {
         return "Internal Error";
     }
-    else if (errno == ER_DBCONN)
-    {
+    else if (errno == ER_DBCONN) {
         return null;
     }
-    else if (errno == ER_DBNAME)
-    {
+    else if (errno == ER_DBNAME) {
         return null;
     }
-    else if (errno == ER_JS)
-    {
+    else if (errno == ER_JS) {
         return null;
     }
-    else if (errno == ER_QUERY)
-    {
+    else if (errno == ER_QUERY) {
         return null;
     }
-    else if (errno == ER_SETTINGS)
-    {
+    else if (errno == ER_SETTINGS) {
         return null;
     }
-    else
-    {
+    else {
         return "Unknown Error";
     }
 }
 
-function createError(err)
-{
+function createError(err) {
     var dom = $("#empty-error").clone();
     dom.removeAttr('id');
     dom.css('display', 'none');
-    
+
     var message = err.message;
     var hint = errno_to_hint(err.errno);
-    if (hint)
-    {
+    if (hint) {
         message = "[" + hint + "] " + message
     }
 
@@ -317,29 +304,26 @@ function createError(err)
 
     $("#notifications").append(dom);
 
-    if (err.errno == ER_DBCONN)
-    {
+    if (err.errno == ER_DBCONN) {
         displaySettings();
         $("#memsql_host").focus();
     }
-    else if (err.errno == ER_DBNAME || err.errno == ER_SETTINGS)
-    {
+    else if (err.errno == ER_DBNAME || err.errno == ER_SETTINGS) {
         displaySettings();
         $("#memsql_db").focus();
     }
-    else if (err.errno == ER_JS)
-    {
+    else if (err.errno == ER_JS) {
         dom.removeClass('alert-error');
     }
-    else if (err.errno == ER_QUERY)
-    {
-        for (var query_id in err.query_map)
-        {
+    else if (err.errno == ER_QUERY) {
+        for (var query_id in err.query_map) {
             query_widget_map[query_id].highlight_error(err.query_map[query_id]);
         }
     }
-    
-    setTimeout(function() { dom.fadeOut('slow'); }, 10000);
+
+    setTimeout(function () {
+        dom.fadeOut('slow');
+    }, 10000);
 }
 
 function freezeSettingsForm() {
@@ -350,70 +334,61 @@ function unfreezeSettingsForm() {
     $("#settings-form").find("input").removeAttr('readonly');
 }
 
-function setLoadingStatus(message)
-{
+function setLoadingStatus(message) {
     var e = $("#loading-message");
     e.find('.message').html(message);
     e.show();
 }
 
-function isLoadingStatusActive()
-{
+function isLoadingStatusActive() {
     return $("#loading-message").css('display') != 'none';
 }
 
-function clearLoadingStatus()
-{
+function clearLoadingStatus() {
     $("#loading-message").fadeOut(1000);
 }
 
-function autoSave(f)
-{
-    setInterval(f, 1000);
+function autoSave(f) {
+    setInterval(f, 2000);
     $(window).click(f);
 }
 
 // --------------
 // Console setup.
 //
-if(typeof(String.prototype.trim) === "undefined")
-{
-    String.prototype.trim = function() 
-    {
+if (typeof(String.prototype.trim) === "undefined") {
+    String.prototype.trim = function () {
         return String(this).replace(/^\s+|\s+$/g, '');
     };
 }
 
-String.prototype.format = function() {
+String.prototype.format = function () {
     var args = arguments;
-    return this.replace(/{(\d+)}/g, function(match, number) { 
+    return this.replace(/{(\d+)}/g, function (match, number) {
         return typeof args[number] != 'undefined'
             ? args[number]
             : match
-        ;
+            ;
     });
 };
 
-function sendSqlCommand(command)
-{
+function sendSqlCommand(command) {
     $.ajax({
-        'type' : 'GET',
-        'url'  : '/sql',
-        'dataType' : 'json',
-        'data'  : {
-            'command' : command,
-            'settings' : JSON.stringify(getSettings())
+        'type': 'GET',
+        'url': '/sql',
+        'dataType': 'json',
+        'data': {
+            'command': command,
+            'settings': JSON.stringify(getSettings())
         },
-        'success' : onSqlOutput,
-        'error' : genericError
+        'success': onSqlOutput,
+        'error': genericError
     });
 }
 
-function onSqlOutput(data, textStatus, jqXHR)
-{
+function onSqlOutput(data, textStatus, jqXHR) {
     jqconsole.Write(data.output + "\n", 'jqconsole-output');
-    if (data.db)
-    {
+    if (data.db) {
         $("#memsql_db").val(data.db);
         cacheSettings();
     }
@@ -426,15 +401,15 @@ var whatSql = 'NoSQL';
 
 function getWhatSql() {
     $.ajax({
-        'type'     : 'GET',
-        'url'      : '/sql',
-        'dataType' : 'json',
-        'data'     : {
-            'command'  : 'show variables;',
-            'settings' : JSON.stringify(getSettings())
+        'type': 'GET',
+        'url': '/sql',
+        'dataType': 'json',
+        'data': {
+            'command': 'show variables;',
+            'settings': JSON.stringify(getSettings())
         },
-        'success'  : onWhatSqlSuccess,
-        'error'    : onWhatSqlFailure
+        'success': onWhatSqlSuccess,
+        'error': onWhatSqlFailure
     });
 }
 
@@ -467,13 +442,10 @@ function onWhatSqlFailure(jqXHR, textStatus, errorThrown) {
     }
 }
 
-function startPrompt()
-{
-    function checkEOI(input)
-    {
+function startPrompt() {
+    function checkEOI(input) {
         trimmed = input.trim();
-        if (trimmed.length > 0 && trimmed[trimmed.length-1] == ';')
-        {
+        if (trimmed.length > 0 && trimmed[trimmed.length - 1] == ';') {
             return false;
         }
         return 0;
@@ -484,8 +456,7 @@ function startPrompt()
 }
 
 var jqconsole = null;
-function initializeConsole()
-{
+function initializeConsole() {
     getWhatSql();
 }
 
@@ -493,7 +464,7 @@ function continueInitConsole() {
     jqconsole = $("#console").jqconsole(consoleWelcomeFormatString.format(whatSql), whatSql.toLowerCase() + "> ", "     -> ");
     $("#console").find(".jqconsole").attr('id', 'inner-memsql-console');
     startPrompt();
-    jqconsole.Focus();
+//    jqconsole.Focus();
 }
 
 function resetConsole() {
@@ -505,37 +476,37 @@ function resetConsole() {
 
 // -------------------
 // General page setup.
-// 
+//
 
-$(document).ready(function() {
+$(document).ready(function () {
     qps_graph = new QueryGraph("Queries Per Second");
 
     reloadDialMaxValue();
 
     activateDialValue();
 
-    $(window).bind('settingsUpdated', function() {
+    $(window).bind('settingsUpdated', function () {
         updateSettings();
         getWhatSql();
     });
 
-    $("#settings-button, #settings-form-close").click(function() {
-        if ($("#settings-form").css("display") == "none")
-        {
+    $("#settings-button, #settings-form-close").click(function () {
+        if ($("#settings-form").css("display") == "none") {
             displaySettings();
         }
-        else
-        {
+        else {
             hideSettings();
-            jqconsole.Focus();
+//            jqconsole.Focus();
             $(window).trigger('settingsUpdated');
         }
     });
 
-    $("[rel=popover]").popover({'placement' : 'right'});
-    $("[rel=tooltip]").tooltip({'placement' : 'right'});
+    $("[rel=popover]").popover({'placement': 'right'});
+    $("[rel=tooltip]").tooltip({'placement': 'right'});
 
-    $("#qps-number").change(function() { setMaxDialValue($("#qps-number").val()); });
+    $("#qps-number").change(function () {
+        setMaxDialValue($("#qps-number").val());
+    });
 
     loadCachedSettings();
     autoSave(cacheSettings);

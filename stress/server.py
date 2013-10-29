@@ -1,12 +1,10 @@
 """Add a description here
 """
 
-from flask import Flask, request, session, g, redirect, url_for, \
-             abort, render_template, flash, make_response
+from flask import Flask, request, redirect, url_for, \
+    render_template, make_response
 
-from cStringIO import StringIO
 import logging
-import multiprocessing
 import re
 import subprocess
 import sys
@@ -19,8 +17,7 @@ import query_table
 import utils
 import worker
 
-import random
-from datetime import datetime, timedelta
+from datetime import datetime
 
 try:
     import simplejson as json
@@ -30,18 +27,18 @@ except ImportError as e:
 logger = logging.getLogger('server')
 logger.setLevel(logging.DEBUG)
 
-DEBUG         = True
-SECRET_KEY    = 'foobar'
-PING_TIMEOUT  = 10   # in seconds
+DEBUG = True
+SECRET_KEY = 'foobar'
+PING_TIMEOUT = 10   # in seconds
 VERY_LONG_AGO = datetime(1990, 03, 02) # send me a bday card
 
 app = Flask(__name__)
 app.config.from_object(__name__)
 
-g_workload  = None
-g_workers   = None
+g_workload = None
+g_workers = None
 g_last_ping = VERY_LONG_AGO
-g_settings  = None
+g_settings = None
 
 # immutable, at least in theory
 class Settings:
@@ -57,7 +54,7 @@ class Settings:
             for key, setting in d.items():
                 if not hasattr(self, key):
                     continue
-                if isinstance(setting, str): 
+                if isinstance(setting, str):
                     setting = setting.lstrip().rstrip()
                 if key in ['memsql_port', 'workers']:
                     setting = int(setting)
@@ -80,34 +77,35 @@ class Settings:
 
     def get_db_conn(self):
         return utils.get_db_conn(self.memsql_host, self.memsql_port, \
-                    self.memsql_user, self.memsql_pass, self.memsql_db)
+                                 self.memsql_user, self.memsql_pass, self.memsql_db)
 
     def get_dict(self):
         return {
-                'memsql_host'   : self.memsql_host,
-                'memsql_port'   : self.memsql_port,
-                'memsql_user'   : self.memsql_user,
-                'memsql_pass'   : self.memsql_pass,
-                'memsql_db'     : self.memsql_db,
-                'workers'       : self.workers
+            'memsql_host': self.memsql_host,
+            'memsql_port': self.memsql_port,
+            'memsql_user': self.memsql_user,
+            'memsql_pass': self.memsql_pass,
+            'memsql_db': self.memsql_db,
+            'workers': self.workers
         }
 
     def get_client_arguments(self):
         return {
-                'host'      : self.memsql_host,
-                'port'      : self.memsql_port,
-                'user'      : self.memsql_user,
-                'passwd'    : self.memsql_pass,
-                'db'        : self.memsql_db,
-                'unix_socket' : '/tmp/memsql.sock'
+            'host': self.memsql_host,
+            'port': self.memsql_port,
+            'user': self.memsql_user,
+            'passwd': self.memsql_pass,
+            'db': self.memsql_db,
+            'unix_socket': '/tmp/memsql.sock'
         }
 
+
 class ServerException(Exception):
-    ER_UNKNOWN  = 0
-    ER_DBCONN   = 1
-    ER_DBNAME   = 2
-    ER_JS       = 3
-    ER_QUERY    = 4
+    ER_UNKNOWN = 0
+    ER_DBCONN = 1
+    ER_DBNAME = 2
+    ER_JS = 3
+    ER_QUERY = 4
     ER_SETTINGS = 5
 
     def __init__(self, message, n=ER_UNKNOWN):
@@ -115,10 +113,11 @@ class ServerException(Exception):
         self.n = n
 
     def to_dict(self):
-        return {'errno' : self.n, 'message' : self.message}
+        return {'errno': self.n, 'message': self.message}
 
     def __str__(self):
         return "[%d] %s" % self.message
+
 
 class WorkloadException(ServerException):
     def __init__(self, id_to_error):
@@ -126,20 +125,22 @@ class WorkloadException(ServerException):
 
     def to_dict(self):
         ret = {
-            'errno' : ServerException.ER_QUERY, 
-            'message' : 'Invalid queries in workload',
-            'query_map' : self.id_to_error
+            'errno': ServerException.ER_QUERY,
+            'message': 'Invalid queries in workload',
+            'query_map': self.id_to_error
         }
         return ret
 
+
 def format_response(running, error=None, **kwargs):
-    ret = {'running' : running}
+    ret = {'running': running}
     if error:
         assert isinstance(error, ServerException)
         ret['error'] = error.to_dict()
-        
+
     ret.update(kwargs)
     return json.dumps(ret)
+
 
 def validate_workload():
     global g_workload
@@ -159,30 +160,32 @@ def validate_workload():
                     conn.query(query)
                     conn.store_result()
                 except _mysql.MySQLError as e:
-                    n,m = e
+                    n, m = e
                     if n in worker.uncaught_errors:
                         failed_queries[q.query_id] = str(e)
                     else:
                         logger.debug("Uncaught [%d] : %s" % (n, m))
-                    
+
             if len(failed_queries) > 0:
                 raise WorkloadException(failed_queries)
-                
+
             if qt.is_empty():
-                raise ServerException("Workload is empty. Adjust the dial to indicate how many times to run the query per-second.", ServerException.ER_JS)
-            
+                raise ServerException("Workload is empty. Adjust the dial to indicate how many times to run the query per-second.",
+                                      ServerException.ER_JS)
+
             logger.debug("VALID WORKLOAD!")
         finally:
             conn.close()
     except _mysql.MySQLError as e:
         check_connection_settings(g_settings)
-        raise ServerException('Unable to validate workload. Could not connect to database.', ServerException.ER_UNKNOWN) 
+        raise ServerException('Unable to validate workload. Could not connect to database.', ServerException.ER_UNKNOWN)
+
 
 def check_connection_settings(settings):
     try:
         conn = settings.get_db_conn()
     except database.MySQLError as e:
-        n,m = e
+        n, m = e
         if n == worker.ER_DB_DNE:
             raise ServerException(str(e), ServerException.ER_DBNAME)
         else:
@@ -204,8 +207,9 @@ def check_workers():
     if not g_workers.is_alive():
         check_connection_settings(g_settings)
         raise ServerException("Unable to initialize workers.")
-        
+
     logger.debug("Checked workers PASSED")
+
 
 def reset_workers():
     global g_workers
@@ -215,6 +219,7 @@ def reset_workers():
         g_workers.clear()
     logger.info("Creating %d workers", g_settings.workers)
     g_workers = worker.WorkerPool(g_settings)
+
 
 @app.route('/', methods=['GET'])
 def render_index():
@@ -226,6 +231,7 @@ def render_index():
     else:
         g_last_ping = datetime.now();
         return render_template('index.html', settings=g_settings, live=False)
+
 
 @app.route('/workload', methods=['POST'])
 def submit_workload():
@@ -244,12 +250,12 @@ def submit_workload():
             g_workload[int(query_id)] = info
         if len(g_workload) == 0:
             raise ServerException("The workload table is empty. Use the workspace below to add new queries.", \
-                    ServerException.ER_JS)
+                                  ServerException.ER_JS)
 
         g_settings = Settings(json.loads(request.values.get('settings')))
         if g_workers is None \
-                or not g_workers.is_alive() \
-                or g_workers.settings_dict != g_settings.get_dict():
+            or not g_workers.is_alive() \
+            or g_workers.settings_dict != g_settings.get_dict():
             reset_workers()
 
         check_workers()
@@ -264,21 +270,24 @@ def submit_workload():
     except ServerException as e:
         return format_response(False, e)
 
+
 @app.route('/ping', methods=['POST'])
 def ping():
     global g_last_ping
-    
+
     if (datetime.now() - g_last_ping).seconds <= PING_TIMEOUT:
         g_last_ping = datetime.now()
         return 'OK'
     else:
         return 'Timeout'
 
+
 @app.route('/unload', methods=['PUT'])
 def unload():
     global g_last_ping
     g_last_ping = VERY_LONG_AGO
     return ''
+
 
 @app.route('/pause', methods=['POST'])
 def pause():
@@ -296,8 +305,11 @@ def pause():
     except ServerException as e:
         return format_response(False, e)
 
+
 stat_check_count = 0
 full_check_period = 10 # should work out to once per second
+
+
 @app.route('/stats', methods=['get'])
 def get_stats():
     global g_workers
@@ -338,6 +350,7 @@ def get_status():
     except ServerException as e:
         return format_response(False, e)
 
+
 @app.route('/live', methods=['GET'])
 def get_live_page():
     global g_settings
@@ -348,7 +361,7 @@ def get_live_page():
 @app.route('/live/stats', methods=['GET'])
 def get_live_stats():
     global g_plancaches
-   
+
     settings = Settings(json.loads(request.values.get('settings', '{}')))
     my_plancache = plancache.plancacheFactory(settings)
 
@@ -362,6 +375,7 @@ def get_live_stats():
         except ServerException as e:
             return format_response(False, e)
 
+
 def get_use_db(cmd):
     cmd = cmd.lstrip().rstrip()
     match = re.search(r'^use\s+([^\s]*)\s*;$', cmd)
@@ -369,6 +383,7 @@ def get_use_db(cmd):
         return match.group(1)
     else:
         None
+
 
 @app.route('/sql', methods=['GET'])
 def run_sql_command():
@@ -423,6 +438,7 @@ def run_sql_command():
     except ServerException as e:
         return format_response(False, e);
 
+
 @app.route('/save', methods=['GET'])
 def save_session():
     settings = request.values.get('settings', None)
@@ -437,10 +453,11 @@ def save_session():
     else:
         save_workload = g_workload
 
-    contents = json.dumps({'settings' : save_settings, 'workload' : save_workload})
-    headers  = {'Content-Type' : 'application/x-download', 'Content-Disposition' : 'attachment;filename=workload.json'}
+    contents = json.dumps({'settings': save_settings, 'workload': save_workload})
+    headers = {'Content-Type': 'application/x-download', 'Content-Disposition': 'attachment;filename=workload.json'}
     print contents
     return make_response((contents, 200, headers))
+
 
 @app.route('/kill', methods=['GET'])
 def kill():
@@ -452,6 +469,7 @@ def kill():
     if g_plancaches:
         del g_plancaches
     sys.exit()
+
 
 def main():
     global g_settings
@@ -468,5 +486,6 @@ def main():
 
     app.run(debug=True, port=options.server_port, host='0.0.0.0')
 
+
 if __name__ == '__main__':
-    main() 
+    main()

@@ -1,27 +1,28 @@
 {"workload": {
-    "1": {
-        "query": "select v from kv \n\twhere k=@",
-        "qps": "95000"
-    },
     "0": {
-        "query": "insert into kv \n\tvalues (@, ^)",
-        "qps": "2000"
+        "query": "select v from kv \n\twhere k=@",
+        "qps": "9500"
     },
-    "3": {
-        "query": "delete from kv \n\twhere k=@",
-        "qps": "1000"
+    "1": {
+        "query": "insert into kv \n\tvalues (@, ^)",
+        "qps": "200"
     },
     "2": {
+        "query": "delete from kv \n\twhere k=@",
+        "qps": "100"
+    },
+    "3": {
         "query": "update kv set v=^\n\twhere k=@",
-        "qps": "2000"
+        "qps": "200"
     }
 }, "settings": {
+    "host_label": "Node X",
     "memsql_host": "127.0.0.1",
     "memsql_db": "quickstart",
     "memsql_port": "3306",
-    "qps-number": "100000",
+    "qps-number": "10000",
     "workers": "50",
     "memsql_pass": "",
     "memsql_user": "appuser",
-    "dial_max_value": 100000
+    "dial_max_value": 10000
 }}

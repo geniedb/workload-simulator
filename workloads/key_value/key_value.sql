@@ -7,3 +7,8 @@ CREATE TABLE `kv` (
   `v` varbinary(64) DEFAULT NULL,
   PRIMARY KEY (`k`) USING HASH
 );
+
+
+
+
+create table kv ( k bigint(20) not null, v varbinary(64) default null, primary key (k) using HASH);

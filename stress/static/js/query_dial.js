@@ -1,12 +1,12 @@
 var global_query_id = 0;
-var query_widget_map = {}
+var query_widget_map = {};
 
 var dial_max_value = 10000;
 
 function QueryWidget() {
     var _this = this;
 
-    _this.initialize = function() {
+    _this.initialize = function () {
         var _this = this;
         _this.query_id = global_query_id++;
         query_widget_map[this.query_id] = _this;
@@ -23,7 +23,7 @@ function QueryWidget() {
         _this.replaceDial(false, 0);
         _this.dom.css('display', 'block');
 
-        _this.dom.click(function() {
+        _this.dom.click(function () {
             if (_this.err_ele) {
                 _this.err_ele.fadeOut(1000);
                 _this.dom.css('border-color', _this.original_border_color);
@@ -39,7 +39,7 @@ function QueryWidget() {
 
         var close_widget = _this.dom.find('.close-widget');
         close_widget.data('query_id', _this.query_id);
-        close_widget.click(function() {
+        close_widget.click(function () {
             var _e = $(this);
             var query_id = _e.data('query_id');
             var widget = query_widget_map[query_id];
@@ -48,25 +48,22 @@ function QueryWidget() {
 
         // Setup CodeMirror
         _this.codemirror = CodeMirror(_this.dom.find('.query-text').get()[0], {
-            mode  : 'mysql',
-            lineWrapping : true
+            mode: 'mysql',
+            lineWrapping: true
         });
 
         _this.dom.find('textarea').attr('id', 'code_mirror_' + _this.query_id);
 
-        if (!livemode)
-        {
-            _this.codemirror.focus();
-        }
+//        _this.codemirror.focus();
     }
 
-    _this.delete = function() {
+    _this.delete = function () {
         _this.dom.detach();
         delete query_widget_map[_this.query_id];
         adjustWidgetMargins();
     };
 
-    _this.highlight_error = function(message) {
+    _this.highlight_error = function (message) {
         _this.dom.css('border-color', 'red');
         _this.err_ele = $("#empty-error").clone();
         _this.err_ele.removeAttr('id');
@@ -75,16 +72,15 @@ function QueryWidget() {
         _this.dom.find('.query-error-message-container').append(_this.err_ele);
     }
 
-    _this.setDialValue = function(value) {
-        if (parseInt(_this.dom.find(".dial").val()) != value)
-        {
+    _this.setDialValue = function (value) {
+        if (parseInt(_this.dom.find(".dial").val()) != value) {
             _this.dial.val(Math.floor(value));
             _this.dial.trigger('change');
         }
     }
-    _this.replaceDial = function(readOnly, newValue) {
+    _this.replaceDial = function (readOnly, newValue) {
         var _this = this;
-        
+
         _this.dial = $("#base-dial").clone();
         _this.dial.removeAttr('id');
 
@@ -94,18 +90,18 @@ function QueryWidget() {
         dialContainer.html('');
         dialContainer.append(_this.dial);
 
-        _this.dial.knob({'fgColor' : '#26ADE4', 'width' : 120, 'readOnly' : readOnly, 'readOnlyStart' : newValue});
+        _this.dial.knob({'fgColor': '#26ADE4', 'width': 80, 'readOnly': readOnly, 'readOnlyStart': newValue});
         _this.setDialValue(newValue);
     };
 
-    _this.freeze = function() {
+    _this.freeze = function () {
         var _this = this;
         _this.codemirror.setOption('readOnly', true);
         _this.dialValue = _this.dom.find(".dial").attr('value');
         _this.replaceDial(true, _this.dialValue);
 
     };
-    _this.unfreeze = function() {
+    _this.unfreeze = function () {
         var _this = this;
         _this.codemirror.setOption('readOnly', false);
         _this.replaceDial(false, _this.dialValue);
@@ -115,8 +111,7 @@ function QueryWidget() {
 }
 
 function clearQueryWidgets() {
-    for (var i in query_widget_map)
-    {
+    for (var i in query_widget_map) {
         query_widget_map[i].delete();
     }
     global_query_id = 0;
@@ -137,25 +132,18 @@ function unfreezeAllQueryWidgets() {
 }
 
 function adjustWidgetMargins() {
-    container_width = $(".widget-container").innerWidth();
-    widget_width = $(".widget").outerWidth();
-    free_space = container_width % widget_width;
-    widgets_per_row = Math.floor(container_width / widget_width);
+    var container_width = $(".widget-container").innerWidth();
+    var widget_width = $(".widget").outerWidth();
+    var free_space = container_width % widget_width;
+    var widgets_per_row = Math.floor(container_width / widget_width);
 
-    $(".widget").each(function(index, value) {
-        if (index % widgets_per_row != widgets_per_row - 1)
-        {
-            $(this).css('margin-right', free_space/widgets_per_row);
-        }
-        else
-        {
-            $(this).css('margin-right', 0);
-        }
-        $(this).css('margin-bottom', Math.min(free_space/widgets_per_row, 40));
+    $(".widget").each(function (index, value) {
+        $(this).css('margin-right', free_space / widgets_per_row);
+        $(this).css('margin-bottom', 20);
     });
 }
 
 
-$(window).resize(function() {
+$(window).resize(function () {
     adjustWidgetMargins();
 });
