@@ -29,7 +29,7 @@ logger.setLevel(logging.DEBUG)
 
 DEBUG = True
 SECRET_KEY = 'foobar'
-PING_TIMEOUT = 10   # in seconds
+PING_TIMEOUT = 30   # in seconds
 VERY_LONG_AGO = datetime(1990, 03, 02) # send me a bday card
 
 app = Flask(__name__)
@@ -208,7 +208,7 @@ def check_workers():
         check_connection_settings(g_settings)
         raise ServerException("Unable to initialize workers.")
 
-    logger.debug("Checked workers PASSED")
+    #logger.debug("Checked workers PASSED")
 
 
 def reset_workers():
@@ -253,6 +253,7 @@ def submit_workload():
                                   ServerException.ER_JS)
 
         g_settings = Settings(json.loads(request.values.get('settings')))
+
         if g_workers is None \
             or not g_workers.is_alive() \
             or g_workers.settings_dict != g_settings.get_dict():

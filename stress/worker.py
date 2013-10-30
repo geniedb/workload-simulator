@@ -1,47 +1,50 @@
 import logging
 from math import ceil
 import multiprocessing
-import _mysql
 import os
 import signal
-import sys
 import time
 import traceback
 import uuid
 
+import _mysql
+
 from query_table import QueryTable
 
-PERIOD  = 0.100
+
+PERIOD = 0.100
+PING_PERIOD = 1.1
 
 logger = logging.getLogger('worker')
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 
 worker_on = False
 
-ER_NO_DB_SELECTED   = 1046
-ER_DB_DNE           = 1049
-ER_COL_UNKNOWN      = 1054
-ER_SYNTAX           = 1064
-ER_COL_COUNT        = 1136
-ER_TABLE_DNE        = 1146
-ER_NOT_SUPPORTED    = 1707
-ER_DEV_MEMORY       = 1720
-ER_SERVER_GONE      = 2006
+ER_NO_DB_SELECTED = 1046
+ER_DB_DNE = 1049
+ER_COL_UNKNOWN = 1054
+ER_SYNTAX = 1064
+ER_COL_COUNT = 1136
+ER_TABLE_DNE = 1146
+ER_NOT_SUPPORTED = 1707
+ER_DEV_MEMORY = 1720
+ER_SERVER_GONE = 2006
 
 uncaught_errors = set([
-    ER_NO_DB_SELECTED,  # No database selected
-    ER_TABLE_DNE,       # Table does not exist
-    ER_SYNTAX,          # Error in MySQL Syntax
-    ER_NOT_SUPPORTED,   # Not supported by MemSQL
-    ER_COL_COUNT,       # Wrong column count
-    ER_DEV_MEMORY,      # Out of Memory
+    ER_NO_DB_SELECTED, # No database selected
+    ER_TABLE_DNE, # Table does not exist
+    ER_SYNTAX, # Error in MySQL Syntax
+    ER_NOT_SUPPORTED, # Not supported by MemSQL
+    ER_COL_COUNT, # Wrong column count
+    ER_DEV_MEMORY, # Out of Memory
     ER_COL_UNKNOWN      # Unknown column
 ])
 
-def worker(index, info_pipe, qps_array, qps_query_table, nworkers, client_arguments):
+
+def worker(index, info_pipe, qps_array, qps_query_table, nworkers, client_arguments, primary_host, failover_host, use_failover):
     try:
         global worker_on
-        prefix = str(uuid.uuid4().int & (2**16-1))
+        prefix = str(uuid.uuid4().int & (2 ** 16 - 1))
 
         # create connection and run sanity check (show tables)
         conn = _mysql.connect(**client_arguments)
@@ -53,11 +56,12 @@ def worker(index, info_pipe, qps_array, qps_query_table, nworkers, client_argume
             try:
                 logger.debug("WAITING FOR INSTRUCTIONS")
                 workload = info_pipe.recv()
+                logger.debug("GOT INSTRUCTIONS")
                 query_table = QueryTable(workload, qps_array, qps_query_table)
                 worker_qps = int(ceil(((query_table.total_qps + 1) / nworkers) * PERIOD))
 
                 # sleep up front to smoothen out QPS
-                time.sleep(index*1.1/nworkers)
+                time.sleep(index * 1.1 / nworkers)
 
                 while True:
                     start_time = time.time()
@@ -67,16 +71,22 @@ def worker(index, info_pipe, qps_array, qps_query_table, nworkers, client_argume
                             query = query_gen.query_f(prefix)
                             conn.query(query)
                             conn.store_result()
-                        except _mysql.MySQLError as (n,m):
-                            logger.debug(n)
-                            if n == ER_SERVER_GONE:
-                                # the server might have died and restarted in between.
-                                # try to reconnect once.
+                            #Failback to primary
+                            if not use_failover.value and client_arguments['host'] == failover_host:
+                                logger.warning("Switching to MySQL Primary")
+                                client_arguments['host'] = primary_host
+                                conn.close()
                                 conn = _mysql.connect(**client_arguments)
-                            elif n in uncaught_errors:
-                                raise
-                            logger.warning(query)
-                            logger.warning("[%d] : %s" % (n,m))
+
+                        except _mysql.MySQLError as (n, m):
+                            logger.warning("[%d] : %s" % (n, m))
+                            if client_arguments['host'] == primary_host:
+                                logger.warning("Switching to MySQL Failover")
+                                client_arguments['host'] = failover_host
+                            else:
+                                client_arguments['host'] = primary_host
+
+                            conn = _mysql.connect(**client_arguments)
 
                         query_gen.stats[index] += 1
 
@@ -89,7 +99,7 @@ def worker(index, info_pipe, qps_array, qps_query_table, nworkers, client_argume
                 logger.debug("WAITING TO SEND PAUSED")
                 try:
                     conn.store_result()
-                except _mysql.MySQLError as (n,m):
+                except _mysql.MySQLError as (n, m):
                     if n == 0:
                         conn.close()
                         conn = _mysql.connect(**client_arguments)
@@ -101,9 +111,10 @@ def worker(index, info_pipe, qps_array, qps_query_table, nworkers, client_argume
         del info_pipe
         exit(1)
 
+
 def stat_loop(qps_array, qps_query_table, pipe):
     POLLING_PERIOD = PERIOD
-    prev_qs = [0]*500
+    prev_qs = [0] * 500
     workload = None
     while True:
         pipe.send(True)
@@ -123,8 +134,35 @@ def stat_loop(qps_array, qps_query_table, pipe):
                 for i in workload.keys():
                     qps_array[i] = 0
 
+
+def ping_loop(use_failover, client_arguments):
+    POLLING_PERIOD = PING_PERIOD
+    logger.warning("Pinging MySQL Primary every %f seconds: %s" % (POLLING_PERIOD, client_arguments['host']))
+
+    while True:
+        try:
+            logger.warning("Pinging MySQL Primary")
+            time.sleep(POLLING_PERIOD)
+            try:
+                conn = _mysql.connect(**client_arguments)
+                conn.query('select version()')
+                conn.store_result()
+                if use_failover.value:
+                    logger.warning("FAILBACK ***")
+
+                use_failover.value = False
+            finally:
+                conn.close()
+        except _mysql.MySQLError:
+            use_failover.value = True
+            logger.warning("Use Failover: %s" % (use_failover.value,))
+        except KeyboardInterrupt:
+            pass
+
+
 class WorkerPool(object):
     MAX_QUERIES = 500
+
     def __init__(self, SettingsCls):
         self.nworkers = SettingsCls.workers
         self.client_arguments = SettingsCls.get_client_arguments()
@@ -132,11 +170,11 @@ class WorkerPool(object):
         self.settings_dict = SettingsCls.get_dict()
 
         # Assume there are no more than 500 queries.
-        self.qps_query_table = [multiprocessing.Array('L', [0]*self.nworkers, lock=False)\
-                            for i in range(self.MAX_QUERIES)]
-        self.qps_array = multiprocessing.Array('d', [0.0]*500, lock=False)
+        self.qps_query_table = [multiprocessing.Array('L', [0] * self.nworkers, lock=False) for i in range(self.MAX_QUERIES)]
+        self.qps_array = multiprocessing.Array('d', [0.0] * 500, lock=False)
 
-        
+        self.use_failover = multiprocessing.Value('b', False)
+
         self.pipes = [None] * (self.nworkers + 1)
         self.workers = [None] * (self.nworkers + 1)
 
@@ -146,7 +184,12 @@ class WorkerPool(object):
         for i in range(self.nworkers):
             self._launch_worker(i)
 
+        self.stat_proc = None
+        self.ping_proc = None
+
         self._launch_stat_proc()
+
+        self._launch_ping_proc()
 
         logger.info("created %d workers" % len(self.workers))
 
@@ -170,14 +213,14 @@ class WorkerPool(object):
     def living_workers(self):
         for w, p in zip(self.workers, self.pipes):
             if w.is_alive():
-                yield w,p
+                yield w, p
 
     def send_workload(self, workload):
         self.workload = workload
         self.paused = False
 
         logger.debug("SENDING PIPES")
-        for w,p in self.living_workers:
+        for w, p in self.living_workers:
             p.send(workload)
 
         logger.debug("SENT PIPES")
@@ -185,16 +228,16 @@ class WorkerPool(object):
 
     def pause(self):
         self.paused = True
-        for w,p in self.living_workers:
+        for w, p in self.living_workers:
             os.kill(w.pid, signal.SIGINT)
         success = True
-        for w,p in self.living_workers:
+        for w, p in self.living_workers:
             success &= self._sync(w, p)
         return success
 
     def clear(self):
         self.pause()
-        for w,p in self.living_workers:
+        for w, p in self.living_workers:
             w.terminate()
             w.join()
 
@@ -210,9 +253,17 @@ class WorkerPool(object):
         logger.debug("launching worker %d" % i)
         info_pipe, worker_pipe = multiprocessing.Pipe()
 
-        w = multiprocessing.Process(target=worker, \
-                            args=(i, worker_pipe, self.qps_query_table, self.qps_query_table, \
-                                  self.nworkers, self.client_arguments))
+        primary_host = self.client_arguments['host']
+        host = list(primary_host)
+        if host[-19] == "1":
+            host[-19] = "2"
+        else:
+            host[-19] = "1"
+        failover_host = "".join(host)
+
+        w = multiprocessing.Process(target=worker, args=(
+            i, worker_pipe, self.qps_query_table, self.qps_query_table, self.nworkers, self.client_arguments, primary_host, failover_host,
+            self.use_failover))
 
         w.start()
         self.pipes[i] = info_pipe
@@ -221,10 +272,15 @@ class WorkerPool(object):
 
     def _launch_stat_proc(self):
         parent_pipe, child_pipe = multiprocessing.Pipe()
-        self.stat_proc = multiprocessing.Process(target=stat_loop, \
-                            args=(self.qps_array, self.qps_query_table, child_pipe))
+        self.stat_proc = multiprocessing.Process(target=stat_loop, args=(self.qps_array, self.qps_query_table, child_pipe))
         self.stat_proc.start()
 
         self.pipes[-1] = parent_pipe
         self.workers[-1] = self.stat_proc
         return self._sync(self.stat_proc, parent_pipe)
+
+    def _launch_ping_proc(self):
+        self.ping_proc = multiprocessing.Process(target=ping_loop, args=(self.use_failover, self.client_arguments))
+        self.ping_proc.start()
+
+        return
