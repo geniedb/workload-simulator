@@ -92,10 +92,10 @@ def worker(index, info_pipe, qps_array, qps_query_table, nworkers, client_argume
                         query_gen.stats[index] += 1
 
                     diff = time.time() - start_time
-                    sleep_time = PERIOD - diff
-                    if sleep_time > 0:
-                        logger.debug("sleep %g" % sleep_time)
-                        time.sleep(sleep_time)
+                    #sleep_time = PERIOD - diff
+                    #if sleep_time > 0:
+                    #    logger.debug("sleep %g" % sleep_time)
+                    #    time.sleep(sleep_time)
             except KeyboardInterrupt as e:
                 logger.debug("WAITING TO SEND PAUSED")
                 try:
@@ -142,7 +142,6 @@ def ping_loop(use_failover, client_arguments):
 
     while True:
         try:
-            logger.warning("Pinging MySQL Primary")
             time.sleep(POLLING_PERIOD)
             try:
                 conn = _mysql.connect(**client_arguments)
@@ -155,8 +154,7 @@ def ping_loop(use_failover, client_arguments):
             finally:
                 conn.close()
         except _mysql.MySQLError:
-            use_failover.value = True
-            logger.warning("Use Failover: %s" % (use_failover.value,))
+            logger.warning("FAILOVER ########")
         except KeyboardInterrupt:
             pass
 
