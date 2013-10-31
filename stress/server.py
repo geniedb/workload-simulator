@@ -485,7 +485,8 @@ def main():
     g_settings.memsql_db = options.memsql_db
     g_settings.workers = options.workers
 
-    app.run(debug=True, port=options.server_port, host='0.0.0.0')
+    logger.error("Listening on Port: %s" % (options.server_port,))
+    app.run(debug=False, port=options.server_port, host='0.0.0.0')
 
 
 if __name__ == '__main__':

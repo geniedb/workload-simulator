@@ -71,8 +71,8 @@ def worker(index, info_pipe, qps_array, qps_query_table, nworkers, client_argume
                             query = query_gen.query_f(prefix)
                             conn.query(query)
                             conn.store_result()
-                            #Failback to primary
-                            if not use_failover.value and client_arguments['host'] == failover_host:
+                            if client_arguments['host'] == failover_host and not use_failover.value:
+                                #Failback to primary
                                 logger.warning("Switching to MySQL Primary")
                                 client_arguments['host'] = primary_host
                                 conn.close()
@@ -83,6 +83,7 @@ def worker(index, info_pipe, qps_array, qps_query_table, nworkers, client_argume
                             if client_arguments['host'] == primary_host:
                                 logger.warning("Switching to MySQL Failover")
                                 client_arguments['host'] = failover_host
+                                use_failover.value = True
                             else:
                                 client_arguments['host'] = primary_host
 
