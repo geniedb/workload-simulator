@@ -2,3 +2,5 @@
 *.pyc
 *.data
 .sass-cache
+
+.idea/*
